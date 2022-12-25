@@ -140,7 +140,19 @@ class OrderBook(WebsocketClient):
             bids = self.get_bids(price)
             if not bids:
                 return
+            if bids[0]['id'] != order['maker_order_id']:
+                print("This order is not in the correct position in the orderbook, this may happen after a change order", order['maker_order_id'])
+                new_bids = []
+                other_bids = []
+                for bid in bids:
+                    if bid['id'] == order['maker_order_id']:
+                        new_bids.append(bid)
+                    else:
+                        other_bids.append(bid)
+                assert len(new_bids) == 1
+                bids = new_bids + other_bids
             assert bids[0]['id'] == order['maker_order_id']
+
             if bids[0]['size'] == size:
                 self.set_bids(price, bids[1:])
             else:
@@ -150,6 +162,17 @@ class OrderBook(WebsocketClient):
             asks = self.get_asks(price)
             if not asks:
                 return
+            if asks[0]['id'] != order['maker_order_id']:
+                print("This order is not in the correct position in the orderbook, this may happen after a change order", order['maker_order_id'])
+                new_asks = []
+                other_asks = []
+                for ask in asks:
+                    if ask['id'] == order['maker_order_id']:
+                        new_asks.append(ask)
+                    else:
+                        other_asks.append(ask)
+                assert len(new_asks) == 1
+                asks = new_asks + other_asks
             assert asks[0]['id'] == order['maker_order_id']
             if asks[0]['size'] == size:
                 self.set_asks(price, asks[1:])
@@ -162,32 +185,63 @@ class OrderBook(WebsocketClient):
             new_size = Decimal(order['new_size'])
         except KeyError:
             return
-
-        try:
-            price = Decimal(order['price'])
-        except KeyError:
-            return
-
-        if order['side'] == 'buy':
-            bids = self.get_bids(price)
-            if bids is None or not any(o['id'] == order['order_id'] for o in bids):
-                return
-            index = [b['id'] for b in bids].index(order['order_id'])
-            bids[index]['size'] = new_size
-            self.set_bids(price, bids)
+        
+        
+        if 'new_price' in order:
+            #we need to delete old order a5 old_price and create a new one with new_price
+            #TODO TODO
+            remove_order = {}
+            remove_order['price'] = order['old_price']
+            remove_order['size'] = order['new_size']
+            remove_order['side'] = order['side']
+            remove_order['order_id'] = order['order_id']
+            self.remove(remove_order)
+            
+            add_order = {}
+            add_order['price'] = order['new_price']
+            add_order['size'] = order['new_size']
+            add_order['side'] = order['side']
+            add_order['order_id'] = order['order_id']
+            self.add(add_order)
+            
         else:
-            asks = self.get_asks(price)
-            if asks is None or not any(o['id'] == order['order_id'] for o in asks):
-                return
-            index = [a['id'] for a in asks].index(order['order_id'])
-            asks[index]['size'] = new_size
-            self.set_asks(price, asks)
+            #We just need to change the size of the order at price
+            if 'price' in order:
+                price = Decimal(order['price'])
+            else:
+                print("Need to find order by id")
+                if order['side'] == 'buy':
+                    old_order = self.get_bid_by_id( order['order_id'] )
+                if order['side'] == 'sell':
+                    old_order = self.get_ask_by_id( order['order_id'] )
+                if old_order is None:
+                    print("Old order not found, probably the order got changed and then matched another order")
+                    return
+                else:
+                    price = old_order['price']
+                    print("Fixed missing price in change order")
 
-        tree = self._asks if order['side'] == 'sell' else self._bids
-        node = tree.get(price)
 
-        if node is None or not any(o['id'] == order['order_id'] for o in node):
-            return
+            if order['side'] == 'buy':
+                bids = self.get_bids(price)
+                if bids is None or not any(o['id'] == order['order_id'] for o in bids):
+                    return
+                index = [b['id'] for b in bids].index(order['order_id'])
+                bids[index]['size'] = new_size
+                self.set_bids(price, bids)
+            else:
+                asks = self.get_asks(price)
+                if asks is None or not any(o['id'] == order['order_id'] for o in asks):
+                    return
+                index = [a['id'] for a in asks].index(order['order_id'])
+                asks[index]['size'] = new_size
+                self.set_asks(price, asks)
+
+        #tree = self._asks if order['side'] == 'sell' else self._bids
+        #node = tree.get(price)
+
+        #if node is None or not any(o['id'] == order['order_id'] for o in node):
+            #return
 
     def get_current_ticker(self):
         return self._current_ticker
@@ -242,6 +296,20 @@ class OrderBook(WebsocketClient):
 
     def set_bids(self, price, bids):
         self._bids[price] = bids
+
+    def get_ask_by_id(self, id):
+        for asks in self._asks.items():
+            for ask in asks[1]:
+                if ask['id'] == id:
+                    return ask
+        return None
+    
+    def get_bid_by_id(self, id):
+        for bids in self._bids.items():
+            for bid in bids[1]:
+                if bid['id'] == id:
+                    return bid
+        return None
 
 
 if __name__ == '__main__':
