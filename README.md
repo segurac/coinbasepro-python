@@ -41,7 +41,7 @@ documentation.**
 ```python
 pip install cbpro
 #or
-pip install git+git://github.com/segurac/coinbasepro-python.git
+pip install git+https://github.com/segurac/coinbasepro-python
 ```
 
 ### Public Client
