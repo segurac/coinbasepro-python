@@ -76,7 +76,10 @@ class OrderBook(WebsocketClient):
         if msg_type == 'open':
             self.add(message)
         elif msg_type == 'done' and 'price' in message:
-            self.remove(message)
+            if not self.remove(message):
+                if message["reason"] == "filled":
+                    self.remove_order_by_id(message)
+
         elif msg_type == 'match':
             self.match(message)
             self._current_ticker = message
@@ -152,7 +155,8 @@ class OrderBook(WebsocketClient):
             if not bids:
                 return
             if bids[0]['id'] != order['maker_order_id']:
-                print("This order is not in the correct position in the orderbook, this may happen after a change order", order['maker_order_id'])
+                print(order)
+                print("This order is not in the correct position in the orderbook, this may happen after a change order", "maker_order_id", order['maker_order_id'], "first bid", bids[0]['id'])
                 new_bids = []
                 other_bids = []
                 for bid in bids:
@@ -164,17 +168,20 @@ class OrderBook(WebsocketClient):
                 bids = new_bids + other_bids
             assert bids[0]['id'] == order['maker_order_id']
 
-            if bids[0]['size'] == size:
-                self.set_bids(price, bids[1:])
-            else:
-                bids[0]['size'] -= size
-                self.set_bids(price, bids)
+            #Do not remove the order from orderbook, we will remove it later with the done message
+#            if bids[0]['size'] == size:
+#                self.set_bids(price, bids[1:])
+#            else:
+
+            bids[0]['size'] -= size
+            self.set_bids(price, bids)
         else:
             asks = self.get_asks(price)
             if not asks:
                 return
             if asks[0]['id'] != order['maker_order_id']:
-                print("This order is not in the correct position in the orderbook, this may happen after a change order", order['maker_order_id'])
+                print(order)
+                print("This order is not in the correct position in the orderbook, this may happen after a change order", "maker_order_id", order['maker_order_id'], "first ask", asks[0]['id'])
                 new_asks = []
                 other_asks = []
                 for ask in asks:
@@ -185,11 +192,11 @@ class OrderBook(WebsocketClient):
                 assert len(new_asks) == 1
                 asks = new_asks + other_asks
             assert asks[0]['id'] == order['maker_order_id']
-            if asks[0]['size'] == size:
-                self.set_asks(price, asks[1:])
-            else:
-                asks[0]['size'] -= size
-                self.set_asks(price, asks)
+#            if asks[0]['size'] == size:
+#                self.set_asks(price, asks[1:])
+#            else:
+            asks[0]['size'] -= size
+            self.set_asks(price, asks)
 
     def change(self, order):
         try:
@@ -323,6 +330,19 @@ class OrderBook(WebsocketClient):
                 if bid['id'] == id:
                     return bid
         return None
+    
+    def remove_order_by_id(self, order):
+        if order['side'] == 'buy':
+            found = self.get_bid_by_id(order['order_id'])
+        else:
+            found = self.get_ask_by_id(order['order_id'])
+        if found:
+            remove_order = {}
+            remove_order['price'] = found['price']
+            remove_order['side'] = order['side']
+            remove_order['order_id'] = order['order_id']
+            
+            self.remove(remove_order)
 
 
 if __name__ == '__main__':
