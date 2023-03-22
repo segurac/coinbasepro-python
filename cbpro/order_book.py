@@ -114,10 +114,16 @@ class OrderBook(WebsocketClient):
             self.set_asks(order['price'], asks)
 
     def remove(self, order):
+        #Try to remove the order and return if it was there or not
+        found_order = False
         price = Decimal(order['price'])
         if order['side'] == 'buy':
             bids = self.get_bids(price)
             if bids is not None:
+                for o in bids: 
+                    if o['id'] == order['order_id']:
+                        found_order=True
+                        break
                 bids = [o for o in bids if o['id'] != order['order_id']]
                 if len(bids) > 0:
                     self.set_bids(price, bids)
@@ -126,11 +132,16 @@ class OrderBook(WebsocketClient):
         else:
             asks = self.get_asks(price)
             if asks is not None:
+                for o in asks: 
+                    if o['id'] == order['order_id']:
+                        found_order=True
+                        break
                 asks = [o for o in asks if o['id'] != order['order_id']]
                 if len(asks) > 0:
                     self.set_asks(price, asks)
                 else:
                     self.remove_asks(price)
+        return found_order
 
     def match(self, order):
         size = Decimal(order['size'])
@@ -195,14 +206,16 @@ class OrderBook(WebsocketClient):
             remove_order['size'] = order['new_size']
             remove_order['side'] = order['side']
             remove_order['order_id'] = order['order_id']
-            self.remove(remove_order)
-            
-            add_order = {}
-            add_order['price'] = order['new_price']
-            add_order['size'] = order['new_size']
-            add_order['side'] = order['side']
-            add_order['order_id'] = order['order_id']
-            self.add(add_order)
+            if self.remove(remove_order):
+                #We should only do the change order if the order was already open, otherwise will will put not-yet open orders in the orderboork, which is wrong
+                add_order = {}
+                add_order['price'] = order['new_price']
+                add_order['size'] = order['new_size']
+                add_order['side'] = order['side']
+                add_order['order_id'] = order['order_id']
+                self.add(add_order)
+            else:
+                print("ignoring change order", order['order_id'])
             
         else:
             #We just need to change the size of the order at price
