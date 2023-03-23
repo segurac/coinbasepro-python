@@ -337,6 +337,7 @@ class OrderBook(WebsocketClient):
         else:
             found = self.get_ask_by_id(order['order_id'])
         if found:
+            print("Found this order in the orderbook with a different price", order)
             remove_order = {}
             remove_order['price'] = found['price']
             remove_order['side'] = order['side']
