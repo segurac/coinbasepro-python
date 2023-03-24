@@ -24,6 +24,7 @@ class OrderBook(WebsocketClient):
         if self._log_to:
             assert hasattr(self._log_to, 'write')
         self._current_ticker = None
+        self.price_dict = {}
 
     @property
     def product_id(self):
@@ -56,6 +57,18 @@ class OrderBook(WebsocketClient):
                 'size': Decimal(ask[1])
             })
         self._sequence = res['sequence']
+        self.populate_price_dict()
+        
+    def populate_price_dict(self):
+        self.price_dict = {}
+        for asks in self._asks.items():
+            for ask in asks[1]:
+                self.price_dict[ask['id']] = ask['price']
+    
+        for bids in self._bids.items():
+            for bid in bids[1]:
+                self.price_dict[bid['id']] = bid['price']
+
 
     def on_message(self, message):
         if self._log_to:
@@ -76,9 +89,10 @@ class OrderBook(WebsocketClient):
         if msg_type == 'open':
             self.add(message)
         elif msg_type == 'done' and 'price' in message:
-            if not self.remove(message):
-                if message["reason"] == "filled":
-                    self.remove_order_by_id(message)
+            self.remove(message)
+            #if not self.remove(message):
+                #if message["reason"] == "filled":
+                    #self.remove_order_by_id(message)
 
         elif msg_type == 'match':
             self.match(message)
@@ -115,9 +129,23 @@ class OrderBook(WebsocketClient):
             else:
                 asks.append(order)
             self.set_asks(order['price'], asks)
+        self.price_dict[order['id']] = order['price']
 
-    def remove(self, order):
+    def remove(self, order_in):
         #Try to remove the order and return if it was there or not
+        order_id = order_in['order_id']
+        order = {}
+        order['order_id'] = order_in['order_id']
+        order['price'] = order_in['price']
+        order['side'] = order_in['side']
+
+        
+        if order_id in self.price_dict:
+            if Decimal(order_in['price']) != self.price_dict[order_id]:
+                print("order_id", order_id, "had an open price of", self.price_dict[order_id] , "and a done price of", order_in['price'])
+                order['price'] = self.price_dict[order_id]
+            del self.price_dict[order_id]
+        
         found_order = False
         price = Decimal(order['price'])
         if order['side'] == 'buy':
@@ -206,6 +234,8 @@ class OrderBook(WebsocketClient):
         
         
         if 'new_price' in order:
+            ##This is not needed because we already take care in add and remove functions
+            ##self.price_dict[ order['order_id']  ] = Decimal(order['new_price'])
             #we need to delete old order a5 old_price and create a new one with new_price
             #TODO TODO
             remove_order = {}
@@ -214,7 +244,7 @@ class OrderBook(WebsocketClient):
             remove_order['side'] = order['side']
             remove_order['order_id'] = order['order_id']
             if self.remove(remove_order):
-                #We should only do the change order if the order was already open, otherwise will will put not-yet open orders in the orderboork, which is wrong
+                #We should only do the change order if the order was already open, otherwise we will put not-yet open orders in the orderboork, which is wrong
                 add_order = {}
                 add_order['price'] = order['new_price']
                 add_order['size'] = order['new_size']
