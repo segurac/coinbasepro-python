@@ -256,25 +256,32 @@ class OrderBook(WebsocketClient):
             
         else:
             #We just need to change the size of the order at price
+            price = None
             if 'price' in order:
-                price = Decimal(order['price'])
+                try:
+                    price = Decimal(order['price'])
+                except:
+                    price = None
+
+            print("Will try to find order by id")
+            if order['side'] == 'buy':
+                old_order = self.get_bid_by_id( order['order_id'] )
+            if order['side'] == 'sell':
+                old_order = self.get_ask_by_id( order['order_id'] )
+            if old_order is None:
+                print("Old order not found, probably the order got changed and then matched another order, not good")
+                return
             else:
-                print("Need to find order by id")
-                if order['side'] == 'buy':
-                    old_order = self.get_bid_by_id( order['order_id'] )
-                if order['side'] == 'sell':
-                    old_order = self.get_ask_by_id( order['order_id'] )
-                if old_order is None:
-                    print("Old order not found, probably the order got changed and then matched another order")
-                    return
-                else:
+                if price is None:
                     price = old_order['price']
                     print("Fixed missing price in change order")
-
+                else:
+                    assert price == old_order['price']:
 
             if order['side'] == 'buy':
                 bids = self.get_bids(price)
                 if bids is None or not any(o['id'] == order['order_id'] for o in bids):
+                    print("I don't know why I am here, but this is not good")
                     return
                 index = [b['id'] for b in bids].index(order['order_id'])
                 bids[index]['size'] = new_size
@@ -282,6 +289,7 @@ class OrderBook(WebsocketClient):
             else:
                 asks = self.get_asks(price)
                 if asks is None or not any(o['id'] == order['order_id'] for o in asks):
+                    print("I don't know why I am here, but this is not good")
                     return
                 index = [a['id'] for a in asks].index(order['order_id'])
                 asks[index]['size'] = new_size
