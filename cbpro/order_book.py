@@ -276,7 +276,7 @@ class OrderBook(WebsocketClient):
                     price = old_order['price']
                     print("Fixed missing price in change order")
                 else:
-                    assert price == old_order['price']:
+                    assert price == old_order['price']
 
             if order['side'] == 'buy':
                 bids = self.get_bids(price)
