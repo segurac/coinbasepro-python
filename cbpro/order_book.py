@@ -230,6 +230,7 @@ class OrderBook(WebsocketClient):
         try:
             new_size = Decimal(order['new_size'])
         except KeyError:
+            print("new_size not in order", order)
             return
         
         
@@ -263,7 +264,7 @@ class OrderBook(WebsocketClient):
                 except:
                     price = None
 
-            print("Will try to find order by id")
+            print("Will try to find order by id", order['order_id'])
             if order['side'] == 'buy':
                 old_order = self.get_bid_by_id( order['order_id'] )
             if order['side'] == 'sell':
