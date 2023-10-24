@@ -11,9 +11,12 @@ import pickle
 from cbpro.public_client import PublicClient
 from cbpro.websocket_client import WebsocketClient
 
+from collections import deque
+
+
 
 class OrderBook(WebsocketClient):
-    def __init__(self, product_id='BTC-USD', log_to=None):
+    def __init__(self, product_id='BTC-USD', log_to=None, forgetful=False):
         super(OrderBook, self).__init__(
             products=product_id, channels=['full'])
         self._asks = SortedDict()
@@ -25,6 +28,8 @@ class OrderBook(WebsocketClient):
             assert hasattr(self._log_to, 'write')
         self._current_ticker = None
         self.price_dict = {}
+        self.forgetful = forgetful
+
 
     @property
     def product_id(self):
@@ -192,17 +197,19 @@ class OrderBook(WebsocketClient):
                         new_bids.append(bid)
                     else:
                         other_bids.append(bid)
-                assert len(new_bids) == 1
+                if not self.forgetful:
+                    assert len(new_bids) == 1
                 bids = new_bids + other_bids
-            assert bids[0]['id'] == order['maker_order_id']
+            if not self.forgetful:
+                assert bids[0]['id'] == order['maker_order_id']
 
             #Do not remove the order from orderbook, we will remove it later with the done message
 #            if bids[0]['size'] == size:
 #                self.set_bids(price, bids[1:])
 #            else:
-
-            bids[0]['size'] -= size
-            self.set_bids(price, bids)
+            if bids[0]['id'] == order['maker_order_id']:
+                bids[0]['size'] -= size
+                self.set_bids(price, bids)
         else:
             asks = self.get_asks(price)
             if not asks:
@@ -217,14 +224,17 @@ class OrderBook(WebsocketClient):
                         new_asks.append(ask)
                     else:
                         other_asks.append(ask)
-                assert len(new_asks) == 1
+                if not self.forgetful:
+                    assert len(new_asks) == 1
                 asks = new_asks + other_asks
-            assert asks[0]['id'] == order['maker_order_id']
+            if not self.forgetful:                
+                assert asks[0]['id'] == order['maker_order_id']
 #            if asks[0]['size'] == size:
 #                self.set_asks(price, asks[1:])
 #            else:
-            asks[0]['size'] -= size
-            self.set_asks(price, asks)
+            if asks[0]['id'] == order['maker_order_id']:
+                asks[0]['size'] -= size
+                self.set_asks(price, asks)
 
     def change(self, order):
         try:
