@@ -147,7 +147,7 @@ class OrderBook(WebsocketClient):
         
         if order_id in self.price_dict:
             if Decimal(order_in['price']) != self.price_dict[order_id]:
-                print("order_id", order_id, "had an open price of", self.price_dict[order_id] , "and a done price of", order_in['price'])
+                #print("order_id", order_id, "had an open price of", self.price_dict[order_id] , "and a done price of", order_in['price'])
                 order['price'] = self.price_dict[order_id]
             del self.price_dict[order_id]
         
@@ -188,8 +188,8 @@ class OrderBook(WebsocketClient):
             if not bids:
                 return
             if bids[0]['id'] != order['maker_order_id']:
-                print(order)
-                print("This order is not in the correct position in the orderbook, this may happen after a change order", "maker_order_id", order['maker_order_id'], "first bid", bids[0]['id'])
+                #print(order)
+                #print("This order is not in the correct position in the orderbook, this may happen after a change order", "maker_order_id", order['maker_order_id'], "first bid", bids[0]['id'])
                 new_bids = []
                 other_bids = []
                 for bid in bids:
@@ -215,8 +215,8 @@ class OrderBook(WebsocketClient):
             if not asks:
                 return
             if asks[0]['id'] != order['maker_order_id']:
-                print(order)
-                print("This order is not in the correct position in the orderbook, this may happen after a change order", "maker_order_id", order['maker_order_id'], "first ask", asks[0]['id'])
+                #print(order)
+                #print("This order is not in the correct position in the orderbook, this may happen after a change order", "maker_order_id", order['maker_order_id'], "first ask", asks[0]['id'])
                 new_asks = []
                 other_asks = []
                 for ask in asks:
@@ -262,8 +262,8 @@ class OrderBook(WebsocketClient):
                 add_order['side'] = order['side']
                 add_order['order_id'] = order['order_id']
                 self.add(add_order)
-            else:
-                print("ignoring change order", order['order_id'])
+            #else:
+            #    print("ignoring change order", order['order_id'])
             
         else:
             #We just need to change the size of the order at price
@@ -386,7 +386,7 @@ class OrderBook(WebsocketClient):
         else:
             found = self.get_ask_by_id(order['order_id'])
         if found:
-            print("Found this order in the orderbook with a different price", order)
+            #print("Found this order in the orderbook with a different price", order)
             remove_order = {}
             remove_order['price'] = found['price']
             remove_order['side'] = order['side']
